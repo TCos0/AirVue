@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>aircaptureco</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: auto; }
+    body { background: #0c0c0c; overflow-x: hidden; }
+
+    /* ─── NAV (fixed, always on top) ───────────────── */
+    #nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 13px;
+      padding: 28px 44px;
+      transition: background 0.5s ease, backdrop-filter 0.5s ease, padding 0.4s ease;
+    }
+    #nav.scrolled {
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 18px 44px;
+    }
+    .nav-brand {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 300;
+      font-size: 13.5px;
+      letter-spacing: 0.16em;
+      color: rgba(255, 255, 255, 0.92);
+      text-transform: lowercase;
+      user-select: none;
+    }
+    .nav-ig {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.88);
+      text-decoration: none;
+      transition: color 0.2s ease, transform 0.2s ease;
+      line-height: 1;
+    }
+    .nav-ig:hover { color: #fff; transform: scale(1.1); }
+    .nav-ig svg { width: 14px; height: 14px; display: block; }
+
+    /* ─── DRONE (fixed, always centred) ────────────── */
+    #drone-fixed {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 200;
+      width: 480px;
+      height: 480px;
+      pointer-events: none;
+      filter: drop-shadow(0 2px 20px rgba(0,0,0,0.25)) drop-shadow(0 0 1px rgba(255,255,255,0.35));
+    }
+    #drone-fixed .primary {
+      stroke: rgba(255, 255, 255, 0.95);
+      fill: none;
+    }
+    #drone-fixed .secondary {
+      stroke: rgba(255, 255, 255, 0.78);
+      fill: rgba(255, 255, 255, 0.10);
+    }
+
+    /* ─── SCROLL CUE (fixed, fades out on scroll) ── */
+    #scroll-cue {
+      position: fixed;
+      bottom: 42px;
+      left: 0; right: 0;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    #scroll-cue span {
+      font-family: 'Open Sans', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .chevron {
+      animation: bounce 2.4s ease-in-out infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0);   opacity: 0.6; }
+      50%       { transform: translateY(7px); opacity: 1;   }
+    }
+
+    /* ─── GALLERY (full-page scroll-driven slide) ── */
+    #gallery-container {
+      position: relative;
+      /* height set by JS */
+    }
+    #gallery-sticky {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .g-slide {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      will-change: transform;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── FIXED NAV ── -->
+<nav id="nav">
+  <span class="nav-brand">aircaptureco</span>
+  <a href="https://www.instagram.com/aircaptureco" class="nav-ig" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke-width="2.5"/>
+    </svg>
+  </a>
+</nav>
+
+<!-- ── FIXED DRONE (centred across all slides) ── -->
+<div id="drone-fixed">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 430" style="width:100%;height:100%">
+    <defs>
+      <clipPath id="co"><path d="M0 0h430v430H0z"/></clipPath>
+      <clipPath id="ci"><path d="M0 0h430v430H0z"/></clipPath>
+    </defs>
+    <g clip-path="url(#co)">
+      <g clip-path="url(#ci)">
+        <!-- Rotor posts -->
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M0 24.593v-49.186" class="secondary"
+              transform="translate(85.076 160.191)"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M0 24.593v-49.186" class="secondary"
+              transform="translate(344.878 160.191)"/>
+        <!-- Arms -->
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M-21.345-40.005a78.881 78.881 0 0 1 19.76 13.56c14.17 13.36 22.93 31.81 22.93 52.19v14.26"
+              class="primary" transform="translate(271.935 275.403)"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M-21.345 40.005v-14.26c0-28.67 17.35-53.53 42.69-65.75"
+              class="primary" transform="translate(158.065 275.403)"/>
+        <!-- Landing legs -->
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M13.25 0h-26.5" class="primary"
+              transform="translate(136.72 315.408)"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M13.25 0h-26.5" class="primary"
+              transform="translate(293.28 315.408)"/>
+        <!-- Body -->
+        <path d="M133.43-5.501v7.14c0 14.105-11.435 25.54-25.54 25.54H59.88v3c0 9.902-8.028 17.93-17.93 17.93h-83.9c-9.902 0-17.93-8.028-17.93-17.93v-3h-48.01c-14.105 0-25.54-11.435-25.54-25.54v-7.14h54.492c9.886 0 18.844-6.221 21.901-15.623 7.563-23.261 29.383-26.985 55.117-26.985h3.84c25.734 0 47.554 3.724 55.117 26.985 3.057 9.402 12.015 15.623 21.901 15.623h54.492z"
+              class="secondary" transform="translate(215.002 190.284)"/>
+        <!-- Wing booms -->
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="7"
+              d="M-206.992-.372h-106.746M49.373 0H-57.373"
+              class="primary" transform="translate(348.433 150.901)"/>
+      </g>
+    </g>
+  </svg>
+</div>
+
+<!-- ── FIXED SCROLL CUE (fades out once scrolling starts) ── -->
+<div id="scroll-cue">
+  <span>Scroll for Gallery</span>
+  <svg class="chevron" width="22" height="14" viewBox="0 0 22 14" fill="none">
+    <path d="M1 1l10 10L21 1" stroke="rgba(255,255,255,0.72)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+
+<!-- ── SCROLL-DRIVEN GALLERY (5 photos, vertical slide transition) ── -->
+<div id="gallery-container">
+  <div id="gallery-sticky">
+    <!-- Slide 0: IMG_3473 — rapeseed field -->
+    <div class="g-slide" style="background-image:url('photos/IMG_3473.PNG'); background-position: center 60%;"></div>
+    <!-- Slide 1: DJI_0301 — river valley aerial -->
+    <div class="g-slide" style="background-image:url('photos/DJI_0301.JPG'); background-position: center center;"></div>
+    <!-- Slide 2: DJI_0050 — open ocean with speedboat -->
+    <div class="g-slide" style="background-image:url('photos/DJI_0050.JPG'); background-position: center center;"></div>
+    <!-- Slide 3: IMG_3475 — sunset over city -->
+    <div class="g-slide" style="background-image:url('photos/IMG_3475.JPG'); background-position: center center;"></div>
+    <!-- Slide 4: DJI_0049 — coastal Mediterranean town -->
+    <div class="g-slide" style="background-image:url('photos/DJI_0049.JPG'); background-position: center 55%;"></div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var nav     = document.getElementById('nav');
+    var cue     = document.getElementById('scroll-cue');
+    var gallery = document.getElementById('gallery-container');
+    var slides  = Array.from(document.querySelectorAll('.g-slide'));
+    var N       = slides.length;
+
+    // Each photo gets one full viewport height of scroll travel
+    gallery.style.height = (N * 100) + 'vh';
+
+    function tick() {
+      var sy = window.scrollY;
+
+      // Nav frosted glass
+      nav.classList.toggle('scrolled', sy > 50);
+
+      // Scroll cue fades out as soon as scrolling starts
+      cue.style.opacity = sy < 10 ? 1 : Math.max(0, 1 - (sy - 10) / 100);
+
+      // Scroll-driven vertical slide transition
+      var rect            = gallery.getBoundingClientRect();
+      var scrolled        = -rect.top;
+      var totalScrollable = gallery.offsetHeight - window.innerHeight;
+
+      if (totalScrollable > 0) {
+        var progress   = Math.max(0, Math.min(1, scrolled / totalScrollable));
+        var floatIndex = progress * (N - 1);
+        var idx        = Math.floor(floatIndex);
+        var frac       = floatIndex - idx;
+
+        for (var i = 0; i < N; i++) {
+          var ty;
+          if (i < idx) {
+            ty = -100;                 // already passed — above viewport
+          } else if (i === idx) {
+            ty = -(frac * 100);        // current slide: slides up as you scroll
+          } else if (i === idx + 1) {
+            ty = (1 - frac) * 100;    // next slide: rises up from below
+          } else {
+            ty = 100;                  // waiting below
+          }
+          slides[i].style.transform = 'translateY(' + ty + '%)';
+        }
+      }
+    }
+
+    window.addEventListener('scroll', tick, { passive: true });
+    tick(); // set initial positions
+  })();
+</script>
+</body>
+</html>
