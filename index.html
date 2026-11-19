@@ -2,13 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AirVue</title>
+  <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Raleway:wght@700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ─── LAYOUT TOKENS (desktop defaults; overridden in media queries) ─── */
+    :root {
+      --logo-x: 25%;             /* shared by #logo-overlay and #category-label */
+      --logo-y: 52%;
+      --logo-w: 220px;
+      --logo-text-size: 51px;
+      --label-offset: 22px;      /* category label distance below the logo centre */
+      --label-size: 28px;
+      --label-line: 34px;        /* JS reads this as LINE_H */
+      --panel-x: 75%;            /* video + About card share this centre */
+      --panel-y: 52%;
+      --video-w: clamp(340px, 32vw, 560px);
+      --card-w: clamp(360px, 34vw, 580px);
+      --glass-bg: rgba(0, 0, 0, 0.42);
+      --glass-border: rgba(255, 255, 255, 0.15);
+      --radius: 12px;
+      --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.25), 0 10px 24px -8px rgba(0, 0, 0, 0.45), 0 30px 70px -20px rgba(0, 0, 0, 0.6);
+      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-r: env(safe-area-inset-right, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-l: env(safe-area-inset-left, 0px);
+    }
 
     html, body { height: 100%; scroll-behavior: auto; }
     body { background: #0c0c0c; overflow-x: hidden; }
@@ -22,14 +47,14 @@
       align-items: center;
       justify-content: flex-end;
       gap: 13px;
-      padding: 28px 44px;
+      padding: calc(28px + var(--safe-t)) calc(44px + var(--safe-r)) 28px calc(44px + var(--safe-l));
       transition: background 0.5s ease, backdrop-filter 0.5s ease, padding 0.4s ease;
     }
     #nav.scrolled {
       background: rgba(0, 0, 0, 0.42);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      padding: 18px 44px;
+      padding: calc(18px + var(--safe-t)) calc(44px + var(--safe-r)) 18px calc(44px + var(--safe-l));
     }
     .nav-group {
       display: flex;
@@ -37,12 +62,16 @@
       gap: 13px;
       text-decoration: none;
       color: rgba(255, 255, 255, 0.88);
-      transition: transform 0.2s ease, color 0.2s ease;
+      border-radius: 6px;
+      flex-shrink: 0;
+      transition: transform 0.35s var(--spring), color 0.2s ease;
     }
-    .nav-group:hover {
-      transform: scale(1.08);
+    .nav-group:focus-visible {
+      outline: 2px solid rgba(255, 255, 255, 0.85);
+      outline-offset: 4px;
       color: #fff;
     }
+    .nav-group:active { transform: scale(0.96); }
     .nav-brand {
       font-family: 'Open Sans', sans-serif;
       font-weight: 300;
@@ -53,10 +82,11 @@
       user-select: none;
       transition: font-weight 0s;
     }
-    .nav-group:hover .nav-brand {
-      font-weight: 600;
-    }
     .nav-group svg { width: 14px; height: 14px; display: block; }
+    @media (hover: hover) {
+      .nav-group:hover { transform: scale(1.08); color: #fff; }
+      .nav-group:hover .nav-brand { font-weight: 600; }
+    }
 
     /* ─── NAV CURSOR ICON ───────────────────────── */
     #nav-cursor {
@@ -79,11 +109,77 @@
       100%     { transform: scale(1);    }
     }
 
-    /* ─── LOGO OVERLAY (fixed, centred) ────────────── */
+    /* ─── REVIEW TICKER (lives inside the dark nav bar) ─── */
+    #review-ticker {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+      margin-right: 18px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+              mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+    }
+    #nav.scrolled #review-ticker { opacity: 1; visibility: visible; }
+    .ticker-track {
+      display: flex;
+      width: max-content;
+      animation: ticker-scroll 40s linear infinite;   /* duration set in JS (~45px/s) */
+      will-change: transform;
+    }
+    .ticker-set { display: flex; align-items: center; flex-shrink: 0; }
+    .review {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 400;
+      font-size: 13.5px;
+      line-height: 1.4;
+      color: rgba(255, 255, 255, 0.9);
+      white-space: nowrap;
+    }
+    .review-by { font-weight: 300; color: rgba(255, 255, 255, 0.62); margin-left: 0.35em; }
+    .ticker-dot {
+      font-size: 16px;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.55);
+      margin: 0 34px;
+      flex-shrink: 0;
+    }
+    @keyframes ticker-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    @media (hover: hover) {
+      #review-ticker:hover .ticker-track { animation-play-state: paused; }
+    }
+    /* Reduced motion: one review at a time, cross-fading (class set by JS) */
+    #review-ticker.is-static { -webkit-mask-image: none; mask-image: none; height: 2.8em; }
+    #review-ticker.is-static .ticker-track { animation: none; width: 100%; height: 100%; position: relative; }
+    #review-ticker.is-static .ticker-set[aria-hidden="true"],
+    #review-ticker.is-static .ticker-dot { display: none; }
+    #review-ticker.is-static .ticker-set { position: absolute; inset: 0; }
+    #review-ticker.is-static .review {
+      position: absolute;
+      left: 0; right: 0; top: 50%;
+      transform: translateY(-50%);
+      white-space: normal;
+      font-size: 12.5px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.9s ease;
+    }
+    #review-ticker.is-static .review.is-active { opacity: 1; }
+
+    /* ─── LOGO OVERLAY (fixed; horizontal position from --logo-x) ─── */
     #logo-overlay {
       position: fixed;
-      top: 52%;
-      left: 50%;
+      top: var(--logo-y);
+      left: var(--logo-x);
       transform: translate(-50%, -50%);
       z-index: 200;
       display: flex;
@@ -94,43 +190,8 @@
       mix-blend-mode: screen;
       opacity: 1;
     }
-
-    /* ─── DIVIDER LINE ──────────────────────────── */
-    #divider-line {
-      position: fixed;
-      top: 50%;
-      left: calc(38.5% + 55px);
-      transform: translateY(-50%);
-      width: 1px;
-      height: 180px;
-      background: rgba(255, 255, 255, 0.42);
-      pointer-events: none;
-      z-index: 200;
-      opacity: 0;
-    }
-
-    /* ─── INTRO DESCRIPTION ─────────────────────── */
-    #intro-description {
-      position: fixed;
-      top: 50%;
-      left: 52%;
-      right: 44px;
-      transform: translateY(-50%);
-      color: rgba(255, 255, 255, 0.82);
-      font-family: 'Raleway', sans-serif;
-      font-weight: 700;
-      font-size: 15px;
-      line-height: 1.75;
-      letter-spacing: 0.03em;
-      pointer-events: none;
-      z-index: 200;
-      opacity: 0;
-      background: rgba(0, 0, 0, 0.30);
-      border-radius: 12px;
-      padding: 22px 26px;
-    }
     #logo-img {
-      width: 220px;
+      width: var(--logo-w);
       display: block;
       filter: invert(1) brightness(10);
       opacity: 0.77;
@@ -138,12 +199,194 @@
     #logo-text {
       font-family: 'Raleway', sans-serif;
       font-weight: 800;
-      font-size: 51px;
+      font-size: var(--logo-text-size);
       letter-spacing: 0.08em;
       color: rgba(255, 255, 255, 0.77);
       display: block;
       text-align: center;
       line-height: 1;
+      will-change: opacity, transform;
+    }
+
+    /* ─── VIDEO PANEL (right of the logo; fades out in phase 2) ─── */
+    #video-panel {
+      position: fixed;
+      left: var(--panel-x);
+      top: var(--panel-y);
+      translate: -50% -50%;
+      width: var(--video-w);
+      aspect-ratio: 16 / 9;
+      z-index: 210;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      background: rgba(0, 0, 0, 0.45);
+      box-shadow: var(--shadow-float);
+      pointer-events: auto;
+      will-change: opacity, transform;
+    }
+    #video-panel iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    #video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background:
+        radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.08), transparent 60%),
+        radial-gradient(90% 80% at 80% 100%, rgba(255, 255, 255, 0.05), transparent 65%),
+        linear-gradient(160deg, #1b1d20 0%, #0d0e10 55%, #050506 100%);
+    }
+    #video-placeholder .play {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+    }
+    #video-placeholder .play svg { width: 20px; height: 20px; margin-left: 4px; display: block; }
+    #video-placeholder span {
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 600;
+      font-size: 11.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* ─── ABOUT CARD (replaces the video in phase 2) ─── */
+    #about-card {
+      position: fixed;
+      left: var(--panel-x);
+      top: var(--panel-y);
+      translate: -50% -50%;
+      width: var(--card-w);
+      z-index: 210;
+      padding: 30px 32px 26px;
+      border-radius: var(--radius);
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px) saturate(115%);
+      -webkit-backdrop-filter: blur(16px) saturate(115%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: var(--shadow-float);
+      color: rgba(255, 255, 255, 0.9);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      will-change: opacity, transform;
+    }
+    #about-card h2 {
+      font-family: 'Raleway', sans-serif;
+      font-weight: 800;
+      font-size: 26px;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+    #about-card p {
+      margin-top: 14px;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .ticks {
+      list-style: none;
+      margin-top: 18px;
+      display: grid;
+      gap: 9px;
+    }
+    .ticks li {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 600;
+      font-size: 14.5px;
+      line-height: 1.35;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    .tick-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+    .tick-icon svg { width: 11px; height: 11px; display: block; }
+    .card-divider {
+      height: 1px;
+      margin: 20px 0 8px;
+      background: linear-gradient(to right, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.06));
+    }
+    .contact-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      margin: 0 -10px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #fff;
+      font-family: 'Open Sans', sans-serif;
+      transition: background-color 0.2s ease, transform 0.35s var(--spring);
+    }
+    .contact-label {
+      flex-shrink: 0;
+      min-width: 9.8em;          /* keeps both contact values aligned */
+      white-space: nowrap;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+    }
+    .contact-value {
+      flex: 1;
+      min-width: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.25);
+      text-underline-offset: 4px;
+      overflow-wrap: anywhere;
+    }
+    .contact-arrow {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      opacity: 0.5;
+      transition: transform 0.35s var(--spring), opacity 0.2s ease;
+    }
+    .contact-row:focus-visible {
+      outline: 2px solid rgba(255, 255, 255, 0.85);
+      outline-offset: 0;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .contact-row:focus-visible .contact-value { text-decoration-color: #fff; }
+    .contact-row:active { background: rgba(255, 255, 255, 0.12); transform: scale(0.985); }
+    @media (hover: hover) {
+      .contact-row:hover { background: rgba(255, 255, 255, 0.08); }
+      .contact-row:hover .contact-value { text-decoration-color: #fff; }
+      .contact-row:hover .contact-arrow { opacity: 1; transform: translateX(3px); }
     }
 
     /* ─── WATERMARK (fixed, diagonal tiled text) ───── */
@@ -157,7 +400,7 @@
     /* ─── SCROLL CUE (fixed, fades out on scroll) ── */
     #scroll-cue {
       position: fixed;
-      bottom: 42px;
+      bottom: calc(42px + var(--safe-b));
       left: 50%;
       transform: translateX(-53%);
       z-index: 200;
@@ -175,11 +418,12 @@
       letter-spacing: 0.22em;
       text-transform: uppercase;
       color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
     }
     #copyright {
       position: fixed;
-      bottom: 42px;
-      right: 44px;
+      bottom: calc(42px + var(--safe-b));
+      right: calc(44px + var(--safe-r));
       z-index: 200;
       pointer-events: none;
       font-family: 'Open Sans', sans-serif;
@@ -187,6 +431,7 @@
       font-weight: 600;
       letter-spacing: 0.22em;
       color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
     }
     .chevron {
       animation: bounce 1.35s ease-in-out infinite;
@@ -200,14 +445,14 @@
     /* ─── CATEGORY LABEL (section title under the logo) ─── */
     #category-label {
       position: fixed;
-      top: 52%;
-      left: 50%;            /* JS keeps this aligned with the logo */
-      margin-top: 22px;     /* sits just under the logo image */
-      width: 0;             /* zero-width anchor; layers self-centre */
+      top: var(--logo-y);
+      left: var(--logo-x);            /* same token as #logo-overlay */
+      margin-top: var(--label-offset); /* sits just under the logo image */
+      width: 0;                        /* zero-width anchor; layers self-centre */
       z-index: 200;
       pointer-events: none;
-      opacity: 0;           /* JS gates this in once the logo settles */
-      will-change: opacity, left;
+      opacity: 0;                      /* JS fades this in during phase 1 */
+      will-change: opacity, transform;
     }
     .cat-layer {
       position: absolute;
@@ -218,8 +463,8 @@
       text-align: center;
       font-family: 'Raleway', sans-serif;
       font-weight: 800;
-      font-size: 28px;
-      line-height: 34px;    /* must match LINE_H in the script */
+      font-size: var(--label-size);
+      line-height: var(--label-line);
       letter-spacing: 0.07em;
       color: #ffffff;
       text-shadow: 0 2px 20px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -235,6 +480,7 @@
       position: sticky;
       top: 0;
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
     }
     .g-slide {
@@ -268,12 +514,136 @@
       object-position: center center;
       display: block;
     }
+
+    /* ═══ PHONES / SMALL TABLETS (≤ 768px): stacked & centred ═══ */
+    @media (max-width: 768px) {
+      :root {
+        --logo-x: 50%;
+        --logo-y: 22%;
+        --logo-w: 150px;
+        --logo-text-size: 38px;
+        --label-offset: 14px;
+        --label-size: 22px;
+        --label-line: 27px;
+        --panel-x: 50%;
+        --panel-y: 62%;
+        --video-w: min(88vw, 520px);
+        --card-w: min(90vw, 520px);
+      }
+      #nav,
+      #nav.scrolled {
+        gap: 4px;
+        min-height: calc(48px + var(--safe-t));
+        padding: var(--safe-t) calc(6px + var(--safe-r)) 0 calc(12px + var(--safe-l));
+      }
+      .nav-brand { display: none; }
+      .nav-group { min-width: 44px; min-height: 44px; justify-content: center; }
+      .nav-group svg { width: 17px; height: 17px; }
+      #review-ticker { margin-right: 4px; }
+      .review { font-size: 13px; }
+      .ticker-dot { margin: 0 24px; }
+
+      /* About card: top edge anchored to the video's top edge, grows downward */
+      #about-card {
+        top: calc(var(--panel-y) - var(--video-w) * 9 / 32);
+        translate: -50% 0;
+        padding: clamp(16px, 4.4vw, 24px) clamp(16px, 4.6vw, 26px) clamp(12px, 3.4vw, 18px);
+      }
+      #about-card h2 { font-size: clamp(18px, 5.2vw, 23px); line-height: 1.2; }
+      #about-card p { margin-top: 9px; font-size: clamp(13px, 3.5vw, 14.5px); line-height: 1.55; }
+      .ticks { margin-top: 12px; gap: 6px; }
+      .ticks li { font-size: clamp(12.5px, 3.35vw, 14px); gap: 9px; }
+      .tick-icon { width: 18px; height: 18px; }
+      .tick-icon svg { width: 10px; height: 10px; }
+      .card-divider { margin: 13px 0 4px; }
+      .contact-row { min-height: 46px; padding: 4px 10px; gap: 10px; }
+      .contact-label { min-width: 9.4em; font-size: 10px; letter-spacing: 0.1em; }
+      .contact-value { font-size: clamp(13.5px, 3.8vw, 15px); }
+
+      #scroll-cue { bottom: calc(44px + var(--safe-b)); transform: translateX(-50%); gap: 6px; }
+      #scroll-cue span { font-size: 12.5px; letter-spacing: 0.2em; }
+      #scroll-cue .chevron { width: 30px; height: 18px; }
+      #copyright {
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(9px + var(--safe-b));
+        font-size: 9px;
+        letter-spacing: 0.16em;
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    /* ═══ LANDSCAPE PHONES (short screens): side-by-side, compact ═══ */
+    @media (orientation: landscape) and (max-height: 500px) {
+      :root {
+        --logo-x: 25%;
+        --logo-y: 54%;
+        --logo-w: 128px;
+        --logo-text-size: 30px;
+        --label-offset: 12px;
+        --label-size: 19px;
+        --label-line: 24px;
+        --panel-x: 72%;
+        --panel-y: 55%;
+        --video-w: min(40vw, 380px, calc((100svh - 130px) * 16 / 9));
+        --card-w: min(48vw, 440px);
+      }
+      #nav,
+      #nav.scrolled {
+        min-height: calc(46px + var(--safe-t));
+        padding: var(--safe-t) calc(10px + var(--safe-r)) 0 calc(16px + var(--safe-l));
+      }
+      .nav-brand { display: none; }
+      .nav-group { min-width: 44px; min-height: 44px; justify-content: center; }
+      #about-card {
+        top: var(--panel-y);
+        translate: -50% -50%;
+        padding: 14px 18px 8px;
+      }
+      #about-card h2 { font-size: 17px; }
+      #about-card p { display: none; }
+      .ticks { margin-top: 9px; gap: 4px; }
+      .ticks li { font-size: 12.5px; }
+      .tick-icon { width: 16px; height: 16px; }
+      .card-divider { margin: 9px 0 2px; }
+      .contact-row { min-height: 40px; padding: 2px 10px; }
+      .contact-label { min-width: 8.6em; font-size: 9.5px; letter-spacing: 0.1em; }
+      .contact-arrow { display: none; }
+      .contact-value { font-size: 13.5px; }
+      #scroll-cue { bottom: calc(22px + var(--safe-b)); }
+      #scroll-cue span { font-size: 11px; }
+      #scroll-cue .chevron { width: 28px; height: 17px; }
+      #copyright {
+        right: calc(16px + var(--safe-r));
+        left: auto;
+        transform: none;
+        bottom: calc(10px + var(--safe-b));
+        font-size: 8.5px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #nav-cursor, .chevron { animation: none; }
+    }
   </style>
 </head>
 <body>
 
 <!-- ── FIXED NAV ── -->
 <nav id="nav">
+  <div id="review-ticker" role="region" aria-label="Client reviews">
+    <div class="ticker-track">
+      <div class="ticker-set">
+        <span class="review">“Responsive, helpful and the quality of the end product was brilliant.”<span class="review-by">— Cobham Rugby Club</span></span>
+        <span class="ticker-dot" aria-hidden="true">●</span>
+        <span class="review">“Incredibly professional and adaptable… I couldn't recommend him enough.”<span class="review-by">— Harlequins Rugby Community Camps</span></span>
+        <span class="ticker-dot" aria-hidden="true">●</span>
+        <span class="review">“Really understood what we were looking for… Highly recommended.”<span class="review-by">— Holtye Golf Club</span></span>
+        <span class="ticker-dot" aria-hidden="true">●</span>
+      </div>
+    </div>
+  </div>
   <svg id="nav-cursor" viewBox="0 0 13 15" fill="none" aria-hidden="true">
     <path d="M11 1 L11 13 L8 10.5 L5.5 15 L3.5 14 L6 9.5 L2 9.5 Z" fill="currentColor"/>
   </svg>
@@ -325,10 +695,37 @@
   <div class="cat-layer" id="cat-new"></div>
 </div>
 
-<!-- ── DIVIDER LINE ── -->
-<div id="divider-line"></div>
-<!-- ── INTRO DESCRIPTION ── -->
-<div id="intro-description">AirVue is a Drone photography company supporting all businesses in and around Surrey. We work closely with every client to deliver a tailored experience, leaving them with professional footage, all within fast turnarounds — so you get the shots you need, when you need it.<br><br>Our wider portfolio can be viewed on our Instagram — accessible through the @Air_Vue in the top right corner.<br><br>For bookings, please email: info@airvue.it.com.</div>
+<!-- ── VIDEO PANEL (right of the logo; JS swaps in the YouTube iframe) ── -->
+<div id="video-panel">
+  <div id="video-placeholder" role="img" aria-label="Showreel coming soon">
+    <div class="play" aria-hidden="true">
+      <svg viewBox="0 0 20 20"><path d="M4 2.5v15L17 10z" fill="rgba(255,255,255,0.9)"/></svg>
+    </div>
+    <span>Showreel coming soon</span>
+  </div>
+</div>
+
+<!-- ── ABOUT CARD (takes the video's place in phase 2) ── -->
+<section id="about-card" aria-labelledby="about-title">
+  <h2 id="about-title">Aerial film &amp; photography for Surrey businesses</h2>
+  <p>From schools and sports facilities to golf clubs, property and local businesses, we capture professional drone footage built around your brief and deliver it fast.</p>
+  <ul class="ticks">
+    <li><span class="tick-icon" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3l2.4 2.4 5.2-5.4" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Tailored to every client</li>
+    <li><span class="tick-icon" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3l2.4 2.4 5.2-5.4" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>CAA-licensed &amp; fully insured</li>
+    <li><span class="tick-icon" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3l2.4 2.4 5.2-5.4" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Fast turnaround</li>
+  </ul>
+  <div class="card-divider" aria-hidden="true"></div>
+  <a class="contact-row" href="mailto:info@airvue.it.com">
+    <span class="contact-label">Book a shoot</span>
+    <span class="contact-value">info@airvue.it.com</span>
+    <svg class="contact-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <a class="contact-row" href="https://www.instagram.com/air_vue/" target="_blank" rel="noopener noreferrer">
+    <span class="contact-label">More work</span>
+    <span class="contact-value">@air_vue on Instagram</span>
+    <svg class="contact-arrow" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+</section>
 
 <!-- ── FIXED SCROLL CUE (fades out once scrolling starts) ── -->
 <div id="scroll-cue">
@@ -371,6 +768,9 @@
 </div>
 
 <script>
+  // ▼▼▼ SHOWREEL: paste your video ID here — the code after 'watch?v=' in the YouTube link (a full link also works) ▼▼▼
+  const YOUTUBE_VIDEO_ID = 'YOUTUBE_VIDEO_ID';
+
   (function () {
     var nav         = document.getElementById('nav');
     var cue         = document.getElementById('scroll-cue');
@@ -379,26 +779,169 @@
     var N           = allSlides.length;
     var logoOverlay = document.getElementById('logo-overlay');
     var logoText    = document.getElementById('logo-text');
-    var dividerLine = document.getElementById('divider-line');
-    var introDesc   = document.getElementById('intro-description');
     var catLabel    = document.getElementById('category-label');
     var catOld      = document.getElementById('cat-old');
     var catNew      = document.getElementById('cat-new');
+    var videoPanel  = document.getElementById('video-panel');
+    var aboutCard   = document.getElementById('about-card');
+    var ticker      = document.getElementById('review-ticker');
+    var wmPattern   = document.getElementById('wmp');
+    var wmEllipse   = document.querySelector('#logo-clear ellipse');
+
+    function mq(q) { return window.matchMedia(q); }
+    function onMQ(m, fn) { if (m.addEventListener) m.addEventListener('change', fn); else m.addListener(fn); }
+    var mqMobile = mq('(max-width: 768px)');
+    var mqShort  = mq('(orientation: landscape) and (max-height: 500px)');
+    var mqReduce = mq('(prefers-reduced-motion: reduce)');
+    var mqCoarse = mq('(pointer: coarse)');
+
+    function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function smooth(t)  { t = clamp01(t); return t * t * (3 - 2 * t); }
 
     // Section title shown per slide index. Group ids -> labelHTML below.
-    var LINE_H        = 34; // px — must match .cat-layer line-height
+    var LINE_H        = 34; // px — read from .cat-layer line-height in layout()
     var stateForSlide = [0, 0, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4];
     var labelHTML     = ['Sports Photography', 'Events', 'Property', 'Property<br>Repair', 'Scenic Shots'];
 
-    // 2 extra viewport-heights for intro animation before gallery begins
-    gallery.style.height = ((N + 2) * 100) + 'vh';
+    // Cached viewport height: drives both the gallery height and tick(), so the two
+    // always agree. Small height-only changes on touch devices (address bar showing /
+    // hiding) are ignored so the scroll mapping never jumps.
+    var VH        = window.innerHeight;
+    var lastW     = window.innerWidth;
+    var floatDist = 80;  // how far the "AirVue" wordmark floats up in phase 1
+    var cardFit   = 0;   // px nudge that keeps the About card fully on screen
+
+    // ── YouTube showreel ─────────────────────────────────
+    var YT_ORIGIN = 'https://www.youtube-nocookie.com';
+    function parseVideoId(raw) {
+      raw = String(raw || '').trim();
+      var m = raw.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/)([\w-]{6,20})/);
+      if (m) return m[1];
+      return /^[\w-]{6,20}$/.test(raw) ? raw : '';
+    }
+    var videoId    = YOUTUBE_VIDEO_ID === 'YOUTUBE_VIDEO_ID' ? '' : parseVideoId(YOUTUBE_VIDEO_ID);
+    var iframe     = null;
+    var ytState    = -2;    // -2 = unknown; otherwise YouTube player state
+    var autoPaused = false;
+    var videoGone  = false;
+
+    function ytSend(obj) {
+      if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(JSON.stringify(obj), YT_ORIGIN);
+    }
+    function ytCommand(func) { ytSend({ event: 'command', func: func, args: [] }); }
+
+    if (videoId) {
+      var vid = encodeURIComponent(videoId);
+      iframe = document.createElement('iframe');
+      iframe.src = YT_ORIGIN + '/embed/' + vid + '?autoplay=1&mute=1&loop=1&playlist=' + vid +
+                   '&controls=1&rel=0&playsinline=1&modestbranding=1&enablejsapi=1';
+      iframe.title = 'AirVue showreel';
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('loading', 'eager');
+      iframe.addEventListener('load', function () {
+        // Ask the player to report its state so we only resume what we paused.
+        ytSend({ event: 'listening', id: 1, channel: 'widget' });
+      });
+      var placeholder = document.getElementById('video-placeholder');
+      if (placeholder) placeholder.parentNode.removeChild(placeholder);
+      videoPanel.appendChild(iframe);
+
+      window.addEventListener('message', function (e) {
+        if (e.origin !== YT_ORIGIN || !iframe || e.source !== iframe.contentWindow) return;
+        var d;
+        try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (err) { return; }
+        if (!d) return;
+        if (d.event === 'onStateChange' && typeof d.info === 'number') ytState = d.info;
+        else if (d.event === 'infoDelivery' && d.info && typeof d.info.playerState === 'number') ytState = d.info.playerState;
+      });
+    }
+
+    // ── Review ticker (inside the nav bar) ───────────────
+    var track   = ticker.querySelector('.ticker-track');
+    var set1    = track.querySelector('.ticker-set');
+    var set2    = set1.cloneNode(true);
+    set2.setAttribute('aria-hidden', 'true');
+    track.appendChild(set2);
+    var reviews = Array.from(set1.querySelectorAll('.review'));
+    var rmIdx   = 0;
+    var rmTimer = null;
+
+    function setTickerSpeed() {
+      var w = set1.getBoundingClientRect().width;            // = half the track
+      if (w > 0) track.style.animationDuration = (w / 45).toFixed(2) + 's'; // ~45px/s
+    }
+    function applyMotionPref() {
+      if (mqReduce.matches) {
+        ticker.classList.add('is-static');
+        reviews.forEach(function (r, i) { r.classList.toggle('is-active', i === rmIdx); });
+        if (!rmTimer) rmTimer = setInterval(function () {
+          reviews[rmIdx].classList.remove('is-active');
+          rmIdx = (rmIdx + 1) % reviews.length;
+          reviews[rmIdx].classList.add('is-active');
+        }, 6000);
+      } else {
+        ticker.classList.remove('is-static');
+        reviews.forEach(function (r) { r.classList.remove('is-active'); });
+        clearInterval(rmTimer);
+        rmTimer = null;
+      }
+    }
+
+    // ── Layout helpers (run on load / resize / orientation change) ──
+    function placeMask() {
+      // Watermark clear-zone follows the logo block (desktop: left; phone: top-centre).
+      var r = logoOverlay.getBoundingClientRect();
+      wmEllipse.setAttribute('cx', (r.left + r.width / 2 - window.innerWidth * 0.005).toFixed(1));
+      wmEllipse.setAttribute('cy', (r.top + r.height / 2).toFixed(1));
+      wmEllipse.setAttribute('rx', Math.round(r.width * 0.91));
+      wmEllipse.setAttribute('ry', Math.round(r.height * 1.28));
+      wmPattern.setAttribute('patternTransform', mqMobile.matches ? 'rotate(-25) scale(0.8)' : 'rotate(-25)');
+    }
+
+    function fitCard() {
+      // Keep the whole About card on screen: below the nav (and, when stacked, below
+      // the logo + a two-line category label) and above the bottom UI.
+      aboutCard.style.transform = 'none';
+      var r       = aboutCard.getBoundingClientRect();
+      var h       = window.innerHeight;
+      var small   = mqMobile.matches || mqShort.matches;
+      var stacked = mqMobile.matches && !mqShort.matches;
+      var minTop  = (small ? 50 : 66);
+      if (stacked) {
+        var lr = logoOverlay.getBoundingClientRect();
+        var labelTop = lr.top + lr.height / 2 + (parseFloat(getComputedStyle(catLabel).marginTop) || 0);
+        minTop = Math.max(minTop, labelTop + 2 * LINE_H + 12);
+      }
+      var maxBottom = h - (small ? 32 : 16);
+      var shift = 0;
+      if (r.bottom > maxBottom) shift = maxBottom - r.bottom;
+      if (r.top + shift < minTop) shift = minTop - r.top;
+      cardFit = Math.round(shift);
+    }
+
+    function layout(force) {
+      var w = window.innerWidth, h = window.innerHeight;
+      if (force || !mqCoarse.matches || w !== lastW || Math.abs(h - VH) > 150) {
+        VH = h;
+        lastW = w;
+      }
+      // Gallery: 2 extra viewport-heights of intro + one per slide (last one via 100vh,
+      // so the final slide is always reachable even when the address bar collapses).
+      gallery.style.height = 'calc(' + ((N + 1) * VH) + 'px + 100vh)';
+      LINE_H    = parseFloat(getComputedStyle(catOld).lineHeight) || 34;
+      floatDist = (mqMobile.matches || mqShort.matches) ? 60 : 80;
+      placeMask();
+      fitCard();
+      setTickerSpeed();
+      tick();
+    }
 
     function tick() {
       var sy = window.scrollY;
-      var vh = window.innerHeight;
-      var vw = window.innerWidth;
+      var vh = VH;
 
-      // Nav frosted glass
+      // Nav frosted glass (the review ticker fades in with it via CSS)
       nav.classList.toggle('scrolled', sy > 50);
 
       // Scroll cue fades out as soon as scrolling starts
@@ -407,25 +950,44 @@
       var rect     = gallery.getBoundingClientRect();
       var scrolled = -rect.top;
 
-      // Phase 1 (0 → 1 viewport height): AirVue text moves up and fades behind logo
-      var phase1 = Math.max(0, Math.min(1, scrolled / vh));
+      // Phase 1 (0 → 1 viewport height): "AirVue" floats up & fades; category label takes its place
+      var phase1 = clamp01(scrolled / vh);
+      // Phase 2 (1 → 2 viewport heights): video fades out, About card fades in at the same spot
+      var phase2 = clamp01((scrolled - vh) / vh);
 
-      // Phase 2 (1 → 2 viewport heights): Logo moves from centre (50%) to 25% across
-      var phase2 = Math.max(0, Math.min(1, (scrolled - vh) / vh));
-
-      // Animate logo text: move up 80px and fade out
       logoText.style.opacity   = String(1 - phase1);
-      logoText.style.transform = 'translateY(' + (phase1 * -80) + 'px)';
+      logoText.style.transform = 'translateY(' + (phase1 * -floatDist) + 'px)';
 
-      // Animate logo overlay: slide horizontally from 50% to 25% of viewport
-      var curX = (0.50 + (0.25 - 0.50) * phase2) * vw;
-      logoOverlay.style.left      = curX + 'px';
-      logoOverlay.style.transform = 'translate(-50%, -50%)';
+      var labelIn = smooth((phase1 - 0.3) / 0.6);
+      catLabel.style.opacity   = String(labelIn);
+      catLabel.style.transform = 'translateY(' + ((1 - labelIn) * 12).toFixed(2) + 'px)';
 
-      // Divider and description fade in during final 30% of phase 2
-      var fade = Math.max(0, Math.min(1, (phase2 - 0.7) / 0.3));
-      dividerLine.style.opacity = String(fade);
-      introDesc.style.opacity   = String(fade);
+      // Video: fade out + drift up 30px over the first half of phase 2
+      var vOut = clamp01(phase2 / 0.5);
+      var vOp  = 1 - smooth(vOut);
+      videoPanel.style.opacity       = String(vOp);
+      videoPanel.style.transform     = 'translateY(' + (-30 * vOut).toFixed(2) + 'px)';
+      videoPanel.style.pointerEvents = vOp > 0.5 ? 'auto' : 'none';
+      videoPanel.style.visibility    = vOp < 0.001 ? 'hidden' : 'visible';
+
+      // About card: starts at 40% of phase 2, rises into the video's place
+      var cIn = smooth((phase2 - 0.4) / 0.5);
+      aboutCard.style.opacity       = String(cIn);
+      aboutCard.style.transform     = 'translateY(' + (cardFit + (1 - cIn) * 28).toFixed(2) + 'px)';
+      aboutCard.style.pointerEvents = cIn > 0.5 ? 'auto' : 'none';
+      aboutCard.style.visibility    = cIn < 0.001 ? 'hidden' : 'visible';
+
+      // Pause the showreel once it has faded out; resume when it comes back
+      if (iframe) {
+        var gone = vOp < 0.02;
+        if (gone && !videoGone) {
+          videoGone = true;
+          if (ytState === 1 || ytState === 3 || ytState === -2) { ytCommand('pauseVideo'); autoPaused = true; }
+        } else if (!gone && videoGone) {
+          videoGone = false;
+          if (autoPaused) { ytCommand('playVideo'); autoPaused = false; }
+        }
+      }
 
       // Gallery slides — offset by 2 viewport-heights of intro scroll
       var galleryScrolled = Math.max(0, scrolled - 2 * vh);
@@ -448,10 +1010,6 @@
       }
 
       // ── Category label (section titles under the logo) ──
-      // Follow the logo horizontally and fade in as the logo settles.
-      catLabel.style.left    = curX + 'px';
-      catLabel.style.opacity = String(fade);
-
       // Ease the swap so each title holds steady while its slide is centred.
       var lp = Math.max(0, Math.min(1, (frac - 0.18) / 0.64));
       lp = lp * lp * (3 - 2 * lp); // smoothstep
@@ -485,8 +1043,13 @@
     }
 
     window.addEventListener('scroll', tick, { passive: true });
-    window.addEventListener('resize', tick);
-    tick();
+    window.addEventListener('resize', function () { layout(false); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { layout(true); }, 150); });
+    window.addEventListener('load', function () { layout(true); });
+    onMQ(mqReduce, applyMotionPref);
+    applyMotionPref();
+    layout(true);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layout(true); });
   })();
 </script>
 </body>
